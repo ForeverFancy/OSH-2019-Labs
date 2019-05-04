@@ -145,9 +145,18 @@ int exec_buildin(struct SimpleCommand sc)
     if (strcmp(sc.arguments[0], "cd") == 0) 
     {
         if (sc.arguments[1])
+        {
+            if(strcmp(sc.arguments[1],"~")==0)
+            {
+                char name[MAX_LENGTH];
+                getName(name);
+                strcpy(sc.arguments[1],"/home/\0");
+                strcat(sc.arguments[1],name);
+            }
             if(chdir(sc.arguments[1])==-1)
                 perror("Error during changing directory");
-        return 1;
+            return 1;
+        }
     }
 
     if (strcmp(sc.arguments[0], "pwd") == 0) 
