@@ -26,7 +26,7 @@ int temp_num=0;
 %token AMPERSAND
 %token NEWLINE
 %token NOTOKEN
-%token SEMICOLON
+%token SEMICOLON AMPERSANDAMPERSAND
 %start command_line
 
 %%
@@ -108,11 +108,7 @@ io_modifiers:  LESS WORD
             }
             ;
 
-cmd_and_args: WORD { //printf("Got the cmd or args:%s\n", $1);
-                    //simplecommand[i].number_of_arguments=+1;
-                    //simplecommand[i].arguments=$1;
-                    //i++;
-                    };
+cmd_and_args: WORD ;
 
 simple_command:  simple_command cmd_and_args {
                      //printf("simple command 1:%s\n", $2);
@@ -169,6 +165,12 @@ background_option: AMPERSAND
 
 
 command_line:   command_line SEMICOLON pipe_list background_option
+                {
+                    command_num[total_command_num]=temp_num;
+                    total_command_num++;
+                    temp_num=0;
+                }
+                | command_line AMPERSANDAMPERSAND pipe_list background_option
                 {
                     command_num[total_command_num]=temp_num;
                     total_command_num++;

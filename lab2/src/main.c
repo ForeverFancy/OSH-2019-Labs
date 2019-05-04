@@ -359,8 +359,6 @@ int main(void)
         YY_BUFFER_STATE buffer = yy_scan_string(cmd);
         yyparse();
         yy_delete_buffer(buffer);
-
-        command_num[total_command_num] = last_command_num;
         
         for (int k = 0; k < total_command_num; k++)
         {

@@ -53,11 +53,15 @@
         return AMPERSAND;
     }
 
+"&&" {
+        return AMPERSANDAMPERSAND;
+    }
+
 ";" {
         return SEMICOLON;
     }
 
-[^";"" "">"">>""<"">&"">>&""|""&"\t\n]+ {
+[^"&&"";"" "">"">>""<"">&"">>&""|""&"\t\n]+ {
         yylval=strdup(yytext);
         //printf("Got word token: '%s'\n", yytext);
         return WORD;
