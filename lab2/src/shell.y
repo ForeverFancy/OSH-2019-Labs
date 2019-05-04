@@ -182,6 +182,7 @@ command_line:   command_line SEMICOLON pipe_list background_option
                     total_command_num++;
                     temp_num=0;
                 }
+                |command_line SEMICOLON background_option
                 |/* empty */;
 
 

@@ -184,13 +184,25 @@ int exec_buildin(struct SimpleCommand sc)
     if (strcmp(sc.arguments[0], "export") == 0)
     {
         char temp[MAX_LENGTH];
-        strcpy(temp,sc.arguments[1]);
-        char *q=strchr(temp,'=');
-        if(q==NULL)
-            return 1;
+        if(sc.arguments[1])
+        {
+
+            strcpy(temp,sc.arguments[1]);
+            char *q=strchr(temp,'=');
+            if(q==NULL)
+                return 1;
+            else
+                *q='\0';
+            setenv(temp,q+1,1);
+        }
         else
-            *q='\0';
-        setenv(temp,q+1,1);
+        {
+            char **var;
+            for (var = __environ;*var !=NULL;++var)
+                printf ("%s\n ",*var);
+            printf("\n");
+        }
+        
         return 1;
     }
 
@@ -313,8 +325,10 @@ int exec_pipeline(struct SimpleCommand sc[], int index, int num, int fdin)
     }
     if (fin != STDIN_FILENO)
     {
-        dup2(fin, STDIN_FILENO);
-        close(fin);
+        if (dup2(fin, STDIN_FILENO) == -1)
+            handle_error("Error during redirecting in file", 1);
+        if (close(fin) == -1)
+            handle_error("Error during closing file", 1);
     }
     if (sc[index + num - 1].redirect)
     {
@@ -405,11 +419,11 @@ int main(void)
                     pid_t pid = fork();
                     if (pid == 0)
                     {
-                        setpgid(0, 0);
                         exec_pipeline(simplecommand, index, command_num[k], STDIN_FILENO);
                         printf("Command not found\n");
                         _exit(1);
                     }
+                    waitpid(pid, NULL, WNOHANG);
                     //jobs++;
                     //printf("[%d] %d\n",jobs,pid_bg);
                     continue;

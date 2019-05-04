@@ -409,16 +409,16 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  24
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   28
+#define YYLAST   36
 
 /* YYNTOKENS -- Number of terminals.  */
 #define YYNTOKENS  17
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  7
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  21
+#define YYNRULES  22
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  34
+#define YYNSTATES  35
 
 /* YYTRANSLATE[YYX] -- Symbol number corresponding to YYX as returned
    by yylex, with out-of-bounds checking.  */
@@ -468,7 +468,7 @@ static const yytype_uint8 yyrline[] =
 {
        0,    34,    34,    45,    50,    61,    72,    77,    93,   111,
      113,   124,   125,   126,   140,   148,   159,   164,   167,   173,
-     179,   185
+     179,   185,   186
 };
 #endif
 
@@ -495,10 +495,10 @@ static const yytype_uint16 yytoknum[] =
 };
 # endif
 
-#define YYPACT_NINF -16
+#define YYPACT_NINF -18
 
 #define yypact_value_is_default(Yystate) \
-  (!!((Yystate) == (-16)))
+  (!!((Yystate) == (-18)))
 
 #define YYTABLE_NINF -1
 
@@ -509,10 +509,10 @@ static const yytype_uint16 yytoknum[] =
      STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-       0,     3,    16,    19,    20,    21,    22,   -16,   -16,     0,
-      -3,     2,    23,    24,   -16,   -16,   -16,   -16,   -16,   -16,
-     -16,     0,   -16,   -16,   -16,     0,     0,   -16,   -16,     0,
-      -3,    -3,   -16,   -16
+      19,    22,     6,     8,    11,    13,    31,   -18,   -18,    19,
+      16,     2,    32,    33,   -18,   -18,   -18,   -18,   -18,   -18,
+     -18,    19,   -18,   -18,   -18,     0,    19,   -18,   -18,    19,
+      16,   -18,    16,   -18,   -18
 };
 
   /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -520,16 +520,16 @@ static const yytype_int8 yypact[] =
      means the default is an error.  */
 static const yytype_uint8 yydefact[] =
 {
-      21,     9,     0,     0,     0,     0,     0,    12,    13,    15,
+      22,     9,     0,     0,     0,     0,     0,    12,    13,    15,
       17,     0,     0,     0,     4,     5,     2,     3,     6,    11,
-      10,     0,    16,    20,     1,     0,     0,     8,     7,    14,
-      17,    17,    18,    19
+      10,     0,    16,    20,     1,    17,     0,     8,     7,    14,
+      17,    21,    17,    18,    19
 };
 
   /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -16,    -9,    -8,     7,   -12,   -15,   -16
+     -18,    -9,    -8,    -2,     7,   -17,   -18
 };
 
   /* YYDEFGOTO[NTERM-NUM].  */
@@ -543,16 +543,18 @@ static const yytype_int8 yydefgoto[] =
      number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_uint8 yytable[] =
 {
-      19,    20,    24,     1,     2,     3,     4,     5,    21,    22,
-       6,    12,    13,    30,    31,    32,    33,    25,    26,    14,
-      19,    20,    15,    16,    17,    18,    27,    28,    29
+      19,    20,    24,     1,     2,     3,     4,     5,    31,    14,
+       6,    15,    22,    33,    16,    34,    17,    25,    26,    29,
+      19,    20,     1,     2,     3,     4,     5,    21,    22,     6,
+      12,    13,    30,    32,    18,    27,    28
 };
 
 static const yytype_uint8 yycheck[] =
 {
-       9,     9,     0,     3,     4,     5,     6,     7,    11,    12,
-      10,     8,     9,    25,    26,    30,    31,    15,    16,     3,
-      29,    29,     3,     3,     3,     3,     3,     3,    21
+       9,     9,     0,     3,     4,     5,     6,     7,    25,     3,
+      10,     3,    12,    30,     3,    32,     3,    15,    16,    21,
+      29,    29,     3,     4,     5,     6,     7,    11,    12,    10,
+       8,     9,    25,    26,     3,     3,     3
 };
 
   /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
@@ -562,7 +564,7 @@ static const yytype_uint8 yystos[] =
        0,     3,     4,     5,     6,     7,    10,    18,    19,    20,
       21,    23,     8,     9,     3,     3,     3,     3,     3,    18,
       19,    11,    12,    22,     0,    15,    16,     3,     3,    20,
-      21,    21,    22,    22
+      21,    22,    21,    22,    22
 };
 
   /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
@@ -570,7 +572,7 @@ static const yytype_uint8 yyr1[] =
 {
        0,    17,    18,    18,    18,    18,    18,    18,    18,    19,
       20,    20,    20,    20,    21,    21,    22,    22,    23,    23,
-      23,    23
+      23,    23,    23
 };
 
   /* YYR2[YYN] -- Number of symbols on the right hand side of rule YYN.  */
@@ -578,7 +580,7 @@ static const yytype_uint8 yyr2[] =
 {
        0,     2,     2,     2,     2,     2,     2,     3,     3,     1,
        2,     2,     1,     1,     3,     1,     1,     0,     4,     4,
-       2,     0
+       2,     3,     0
 };
 
 
@@ -1266,7 +1268,7 @@ yyreduce:
                 simplecommand[i].redirect=1;
                 simplecommand[i].redirect_in=1;
             }
-#line 1270 "src/y.tab.c" /* yacc.c:1646  */
+#line 1272 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 3:
@@ -1275,7 +1277,7 @@ yyreduce:
                 //printf("Got << redirection: %s\n", $2);
                 //TODO: add "<<". 
             }
-#line 1279 "src/y.tab.c" /* yacc.c:1646  */
+#line 1281 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 4:
@@ -1290,7 +1292,7 @@ yyreduce:
                 simplecommand[i].redirect=1;
                 simplecommand[i].redirect_out_cover=1;
             }
-#line 1294 "src/y.tab.c" /* yacc.c:1646  */
+#line 1296 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 5:
@@ -1305,7 +1307,7 @@ yyreduce:
                 simplecommand[i].redirect=1;
                 simplecommand[i].redirect_out_append=1;
             }
-#line 1309 "src/y.tab.c" /* yacc.c:1646  */
+#line 1311 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 6:
@@ -1314,7 +1316,7 @@ yyreduce:
                 //printf("Got >>& redircection:%s\n", $2);
                 //TODO:add ">>&".
             }
-#line 1318 "src/y.tab.c" /* yacc.c:1646  */
+#line 1320 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 7:
@@ -1334,7 +1336,7 @@ yyreduce:
                 simplecommand[i].redirect_combination=1;
                 simplecommand[i].redirect=1;
             }
-#line 1338 "src/y.tab.c" /* yacc.c:1646  */
+#line 1340 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 8:
@@ -1354,7 +1356,7 @@ yyreduce:
                 simplecommand[i].redirect_combination=1;
                 simplecommand[i].redirect=1;
             }
-#line 1358 "src/y.tab.c" /* yacc.c:1646  */
+#line 1360 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 10:
@@ -1370,7 +1372,7 @@ yyreduce:
                     simplecommand[i].number_of_arguments++;
                     j++;
                     }
-#line 1374 "src/y.tab.c" /* yacc.c:1646  */
+#line 1376 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 13:
@@ -1386,7 +1388,7 @@ yyreduce:
                     simplecommand[i].number_of_arguments++;
                     j++;
                     }
-#line 1390 "src/y.tab.c" /* yacc.c:1646  */
+#line 1392 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 14:
@@ -1399,7 +1401,7 @@ yyreduce:
                     j=0;
                     //printf("i=%d j=%d\n",i,j);
                     }
-#line 1403 "src/y.tab.c" /* yacc.c:1646  */
+#line 1405 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 15:
@@ -1412,7 +1414,7 @@ yyreduce:
                     j=0;
                     //printf("i=%d j=%d\n",i,j);
                     }
-#line 1416 "src/y.tab.c" /* yacc.c:1646  */
+#line 1418 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 16:
@@ -1421,7 +1423,7 @@ yyreduce:
                     //printf("Got background &\n");
                     simplecommand[i-1].background=1; 
                 }
-#line 1425 "src/y.tab.c" /* yacc.c:1646  */
+#line 1427 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 18:
@@ -1431,7 +1433,7 @@ yyreduce:
                     total_command_num++;
                     temp_num=0;
                 }
-#line 1435 "src/y.tab.c" /* yacc.c:1646  */
+#line 1437 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 19:
@@ -1441,7 +1443,7 @@ yyreduce:
                     total_command_num++;
                     temp_num=0;
                 }
-#line 1445 "src/y.tab.c" /* yacc.c:1646  */
+#line 1447 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
   case 20:
@@ -1451,11 +1453,11 @@ yyreduce:
                     total_command_num++;
                     temp_num=0;
                 }
-#line 1455 "src/y.tab.c" /* yacc.c:1646  */
+#line 1457 "src/y.tab.c" /* yacc.c:1646  */
     break;
 
 
-#line 1459 "src/y.tab.c" /* yacc.c:1646  */
+#line 1461 "src/y.tab.c" /* yacc.c:1646  */
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -1683,5 +1685,5 @@ yyreturn:
 #endif
   return yyresult;
 }
-#line 188 "src/shell.y" /* yacc.c:1906  */
+#line 189 "src/shell.y" /* yacc.c:1906  */
 
