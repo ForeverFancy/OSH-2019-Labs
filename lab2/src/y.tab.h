@@ -57,7 +57,8 @@ extern int yydebug;
     AMPERSAND = 267,
     NEWLINE = 268,
     NOTOKEN = 269,
-    SEMICOLON = 270
+    SEMICOLON = 270,
+    AMPERSANDAMPERSAND = 271
   };
 #endif
 /* Tokens.  */
@@ -74,6 +75,7 @@ extern int yydebug;
 #define NEWLINE 268
 #define NOTOKEN 269
 #define SEMICOLON 270
+#define AMPERSANDAMPERSAND 271
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED

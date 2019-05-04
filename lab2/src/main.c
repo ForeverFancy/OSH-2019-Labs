@@ -82,11 +82,15 @@ void getPrompt(char prompt[])
     else
         hint[0]='#';
     hint[1]='\0';
-    strcpy(prompt,name);
+    strcpy(prompt,"\033[0;32m\0");
+    strcat(prompt,name);
     strcat(prompt,"@\0");
     strcat(prompt,hostname);
+    strcat(prompt,"\033[00m");
     strcat(prompt,":\0");
+    strcat(prompt,"\033[0;34m\0");
     strcat(prompt,wd);
+    strcat(prompt,"\033[00m\0");
     strcat(prompt,hint);
     strcat(prompt," \0");
 }
