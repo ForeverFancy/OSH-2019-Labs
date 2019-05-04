@@ -382,6 +382,8 @@ int main(void)
             if (*cmd)
                 add_history(cmd);
         }
+        else
+            return 0;
 
         YY_BUFFER_STATE buffer = yy_scan_string(cmd);
         yyparse();
