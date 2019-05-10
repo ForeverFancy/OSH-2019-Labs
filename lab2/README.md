@@ -4,6 +4,7 @@
 
 在`lab2`目录下执行
 ```shell
+$ mkdir obj
 $ make
 $ ./bwsh
 ```
