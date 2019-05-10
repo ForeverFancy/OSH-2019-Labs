@@ -8,7 +8,7 @@ $ mkdir obj
 $ make
 $ ./bwsh
 ```
-即可运行。
+即可运行（依赖`readline`库）。
 
 之后可以
 ```shell
