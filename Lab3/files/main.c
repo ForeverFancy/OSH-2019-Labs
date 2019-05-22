@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include<netdb.h>
+#include <netdb.h>
 
 #define BIND_IP_ADDR "127.0.0.1"
 #define BIND_PORT 8000
@@ -21,6 +21,8 @@
 #define HTTP_STATUS_404 "404 Not Found"
 #define HTTP_STATUS_500 "500 Internal Server Error"
 
+int clients[MAX_CONN];
+
 void parse_request(char* request, ssize_t req_len, char* path, ssize_t* path_len)
 {
     char *req = request;
@@ -33,9 +35,8 @@ void parse_request(char* request, ssize_t req_len, char* path, ssize_t* path_len
     *path_len = strlen(path);
 }
 
-void handle_client(int client_socket)
+int handle_client(int client_socket)
 {
-    char msg[] = "GET /hello.html HTTP/1.0";
     char *path = (char *)malloc(MAX_PATH_LEN * sizeof(char));
     ssize_t path_len;
     
@@ -58,7 +59,6 @@ void handle_client(int client_socket)
     char *response = (char *)malloc(MAX_SEND_LEN * sizeof(char));
     if ((fd = open(path, O_RDONLY)) != -1) //FILE FOUND
     {
-            
         int bytes_read = read(fd, return_buf, 1024);
         printf("Read success.\n");
     }
@@ -66,15 +66,17 @@ void handle_client(int client_socket)
                 HTTP_STATUS_200, strlen(return_buf), return_buf);
     size_t response_len = strlen(response);
     write(client_socket, response, response_len);
+
+    shutdown(client_socket, SHUT_RDWR);
     close(client_socket);
     free(response);
 
-    return;
+    return 0;
 }
 
 int main()
 {
-    
+    int available_index = 0;
     int server_socket;
     if ((server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
     {
@@ -103,15 +105,32 @@ int main()
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
+    for (int i = 0; i < MAX_CONN;i++)
+    {
+        clients[i] = -1;
+    }
+
     while (1)
     {
         int client_socket;
-        if((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_size)) < 0)
+        if ((clients[available_index] = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_size)) < 0)
         {
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
-        handle_client(client_socket);
+        else
+        {
+            pid_t pid = fork();
+            if(pid==0)
+            {
+                int flag = handle_client(clients[available_index]);
+                if(flag==0)
+                    clients[available_index] = -1;
+                _exit(0);
+            }
+            while(clients[available_index]!=-1)
+                available_index=(available_index+1)%MAX_CONN;
+        }
     }
 
     return 0;
