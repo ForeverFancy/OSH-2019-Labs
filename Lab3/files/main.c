@@ -39,6 +39,9 @@ int handle_client(int client_socket)
 {
     char *path = (char *)malloc(MAX_PATH_LEN * sizeof(char));
     ssize_t path_len;
+    int fd;
+    char *return_buf = (char *)malloc(MAX_SEND_LEN * sizeof(char));
+    char *response = (char *)malloc(MAX_SEND_LEN * sizeof(char));
     
     char buffer[1024] = {0};
     int valread = read( client_socket , buffer, 1024);
@@ -51,19 +54,38 @@ int handle_client(int client_socket)
         printf("buffer:%s\n", buffer);
         parse_request(buffer, strlen(buffer), path, &path_len);
         printf("Path:%s\nPath_len:%ld\n", path, path_len);
+        if(path_len==0)
+        {
+            sprintf(response,"HTTP/1.0 %s\r\nContent-Length: 0\r\n\r\n",
+                HTTP_STATUS_500);
+            size_t response_len = strlen(response);
+            write(client_socket, response, response_len);
+
+            shutdown(client_socket, SHUT_RDWR);
+            close(client_socket);
+            free(response);
+
+            return 0;
+        }
         if(path[0]=='/')
             path++;
     }
-    int fd;
-    char *return_buf = (char *)malloc(MAX_SEND_LEN * sizeof(char));
-    char *response = (char *)malloc(MAX_SEND_LEN * sizeof(char));
+    
     if ((fd = open(path, O_RDONLY)) != -1) //FILE FOUND
     {
         int bytes_read = read(fd, return_buf, 1024);
         printf("Read success.\n");
-    }
-    sprintf(response,"HTTP/1.0 %s\r\nContent-Length: %zd\r\n\r\n%s",
+        sprintf(response,"HTTP/1.0 %s\r\nContent-Length: %zd\r\n\r\n%s",
                 HTTP_STATUS_200, strlen(return_buf), return_buf);
+        size_t response_len = strlen(response);
+    }
+    else
+    {
+        sprintf(response,"HTTP/1.0 %s\r\nContent-Length: 0\r\n\r\n",
+                HTTP_STATUS_404);
+    }
+    
+    
     size_t response_len = strlen(response);
     write(client_socket, response, response_len);
 
@@ -81,7 +103,7 @@ int main()
     if ((server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
     {
         perror("Could not open socket");
-        return 0;
+        return 1;
     }
 
     struct sockaddr_in server_addr;
@@ -93,13 +115,13 @@ int main()
     if(bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))<0)
     {
         perror("Bind failed");
-        return 0;
+        return 1;
     }
 
     if(listen(server_socket, MAX_CONN))
     {
         perror("Listen failed");
-        return 0;
+        return 1;
     }
 
     struct sockaddr_in client_addr;
