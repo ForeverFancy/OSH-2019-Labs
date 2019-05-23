@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -17,13 +19,11 @@
 #define MAX_SEND_LEN 1048576
 #define MAX_PATH_LEN 1024
 #define MAX_HOST_LEN 1024
-#define MAX_CONN 100
+#define MAX_CONN 300
 
-#define HTTP_STATUS_200 "200 OK"
-#define HTTP_STATUS_404 "404 Not Found"
-#define HTTP_STATUS_500 "500 Internal Server Error"
-
-int clients[MAX_CONN];
+#define HTTP_STATUS_200 "HTTP/1.0 200 OK\r\n"
+#define HTTP_STATUS_404 "HTTP/1.0 404 Not Found"
+#define HTTP_STATUS_500 "HTTP/1.0 500 Internal Server Error"
 
 void handle_error(char *msg)
 {
@@ -35,37 +35,41 @@ void set_nonblocking(int fd)
 {
     int flag;
     if ((flag = fcntl(fd, F_GETFL, 0)) == -1)
-        handle_error("fcntl1");
+        handle_error("fcntl");
     else
     {
         int temp;
         flag = flag | O_NONBLOCK;
         if ((temp = fcntl(fd, F_SETFL, flag)) == -1)
-            handle_error("fcntl2");
+            handle_error("fcntl");
     }
 }
 
-void parse_request(char* request, ssize_t req_len, char* path, ssize_t* path_len)
+char *parse_request(char* request, ssize_t req_len, ssize_t* path_len)
 {
     char *req = request;
+    char *path = (char *)malloc(MAX_PATH_LEN * sizeof(char));
     char *method;
     method = strtok(req, " ");
     if (strcmp(method, "GET") != 0)
         //TODO:Handle the wrong method.
-        return;
+        return NULL;
     strcpy(path,strtok(NULL, " "));
+    strcat(path, "\0");
     *path_len = strlen(path);
+    return path;
 }
 
-int handle_client(int client_socket)
+int handle_client(int epoll_fd, int client_socket)
 {
-    char *path = (char *)malloc(MAX_PATH_LEN * sizeof(char));
+    char *path;
+    char *temp_path;
     ssize_t path_len;
     int fd;
     char *return_buf = (char *)malloc(MAX_SEND_LEN * sizeof(char));
     char *response = (char *)malloc(MAX_SEND_LEN * sizeof(char));
     
-    char buffer[1024] = {0};
+    char *buffer = (char *)malloc(MAX_RECV_LEN * sizeof(char));
     int valread = read( client_socket , buffer, 1024);
     if (valread < 0)
     {
@@ -74,7 +78,8 @@ int handle_client(int client_socket)
     else
     {
         printf("buffer:%s\n", buffer);
-        parse_request(buffer, strlen(buffer), path, &path_len);
+        path = parse_request(buffer, strlen(buffer), &path_len);
+        temp_path = path;
         printf("Path:%s\nPath_len:%ld\n", path, path_len);
         if(path_len==0)
         {
@@ -90,16 +95,21 @@ int handle_client(int client_socket)
             return 0;
         }
         if(path[0]=='/')
-            path++;
+            temp_path++;
     }
     
-    if ((fd = open(path, O_RDONLY)) != -1) //FILE FOUND
+    if ((fd = open(temp_path, O_RDONLY | O_NONBLOCK)) != -1) //FILE FOUND
     {
-        int bytes_read = read(fd, return_buf, 1024);
-        printf("Read success.\n");
-        sprintf(response,"HTTP/1.0 %s\r\nContent-Length: %zd\r\n\r\n%s",
-                HTTP_STATUS_200, strlen(return_buf), return_buf);
-        size_t response_len = strlen(response);
+        struct stat stat_buf;
+	    fstat(fd,&stat_buf);
+        send(client_socket, HTTP_STATUS_200, strlen(HTTP_STATUS_200), 0);
+        sprintf(response,"Content-Length: %zd\r\n\r\n",stat_buf.st_size);
+        send(client_socket, response, strlen(response), 0);
+        sendfile(client_socket, fd, NULL, stat_buf.st_size);
+        close(fd);
+        // int bytes_read = read(fd, return_buf, 1024);
+        // printf("Read success.\n");
+        // size_t response_len = strlen(response);
     }
     else
     {
@@ -108,19 +118,25 @@ int handle_client(int client_socket)
     }
     
     
-    size_t response_len = strlen(response);
-    write(client_socket, response, response_len);
+    // size_t response_len = strlen(response);
+    // write(client_socket, response, response_len);
+
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
+       handle_error("epoll delete");
 
     shutdown(client_socket, SHUT_RDWR);
     close(client_socket);
+    
     free(response);
+    free(return_buf);
+    free(buffer);
+    free(path);
 
     return 0;
 }
 
 int run_server()
 {
-    int available_index = 0;
     int server_socket;
     int epfd, num_of_events;
     struct epoll_event ev, events[MAX_CONN];
@@ -162,11 +178,6 @@ int run_server()
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
 
-    for (int i = 0; i < MAX_CONN;i++)
-    {
-        clients[i] = -1;
-    }
-
     while (1)
     {
         int client_socket;
@@ -187,7 +198,7 @@ int run_server()
                 if((epoll_ctl(epfd, EPOLL_CTL_ADD, client_socket, &ev)) == -1)
                     handle_error("epoll connect");
                 else
-                    handle_client(client_socket);
+                    handle_client(epfd, client_socket);
             }
         }
         
