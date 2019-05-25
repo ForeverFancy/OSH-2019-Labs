@@ -5,17 +5,16 @@
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 #include <string.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <pthread.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/resource.h>
 
-#define BIND_IP_ADDR "127.0.0.1"
+#define BIND_IP_ADDR "0.0.0.0"
 #define BIND_PORT 8000
 #define MAX_RECV_LEN 1048576
 #define MAX_SEND_LEN 1048576
@@ -56,6 +55,17 @@ void init()
     memset(buff, 0, MAX_FDS * sizeof(struct buf));
 }
 
+void set_root()
+{
+    char wd[MAX_PATH_LEN];
+    getcwd(wd, sizeof(wd));
+    chroot(wd);
+    chdir(".");
+#ifdef DEBUG
+
+#endif
+}
+
 void handle_error(char *msg)
 {
     perror(msg);
@@ -86,40 +96,69 @@ void set_nonblocking(int fd)
     }
 }
 
-void parse_request(char *request, int length, char *path, ssize_t *path_len)
+void close_request(int client_socket)
+{
+#ifdef DEBUG
+    printf("Reject the request.\n");
+#endif
+    memset(&buff[client_socket], 0, sizeof(struct buf));
+    close(client_socket);
+    return;
+}
+
+int parse_request(int client_socket, char *request, int length, char *path, ssize_t *path_len)
 {
     char *req = request;
-#ifdef DEBUG
 
-#endif
-    char *method;
-    method = strtok(req, " ");
-    if (strcmp(method, "GET") != 0)
-        return;
-
+    char *method = (char *)malloc(MAX_PATH_LEN * sizeof(char));
     int t = 0;
     while (req[t] != '\0' && req[t] != ' ' && t < length)
     {
         t++;
     }
-    if (req[t] == '\0')
-        ;
-    //TODO:REJECT
     int s = t + 1;
     while (req[s] != '\0' && req[s] != ' ' && s < length)
     {
         s++;
     }
+
+    if (req[t] == '\0')
+    {
+        free(method);
+        close_request(client_socket);
+        return -1;
+    }
+    else if (req[t] == ' ')
+    {
+        req[t] = '\0';
+        strncpy(method, req, t);
+#ifdef DEBUG
+        printf("t=%d\n", t);
+        printf("method:%s\n", method);
+#endif
+        if (strcmp(method, "GET") != 0)
+        {
+            close_request(client_socket);
+            free(method);
+            return -1;
+        }
+    }
+
     if (req[s] == '\0')
-        ;
-    //TODO:REJECT
+    {
+        free(method);
+        close_request(client_socket);
+        return -1;
+    }
     req[s] = '\0';
     strncpy(path, req + t + 1, s - t);
-    *path_len = s - t;
+    *path_len = s - t - 1;
+    free(method);
 
 #ifdef DEBUG
     printf("%s\n", path);
 #endif
+    return 0;
 }
 
 int handle_read(int epoll_fd, int client_socket)
@@ -152,7 +191,7 @@ int handle_read(int epoll_fd, int client_socket)
                 {
                     return 0;
                 }
-                else if(errno == EPIPE)
+                else if (errno == EPIPE)
                 {
                     return -1;
                 }
@@ -190,21 +229,40 @@ int handle_write(int epoll_fd, int client_socket)
     printf("Sending to client.\n");
     printf("Client num:%d\n", client_socket);
 #endif
-    int fd;
-#ifdef DEBUG
-    printf("read_path?%d\n", buff[client_socket].read_path);
-    printf("Client num:%d\n", client_socket);
-#endif
 
+    int fd;
     if (buff[client_socket].read_path == 0)
     {
         char *temp_path;
         char *path = (char *)malloc(MAX_PATH_LEN * sizeof(char));
         ssize_t path_len;
         char *buffer = buff[client_socket].read_buffer;
-        parse_request(buffer, buff[client_socket].read_offset, path, &path_len);
+        int ret = parse_request(client_socket, buffer, buff[client_socket].read_offset, path, &path_len);
+        if (ret == -1)
+        {
+            free(path);
+            return 0;
+        }
         temp_path = path;
-        if (path[0] == '/')
+        if (path_len == 0)
+        {
+            send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+            free(path);
+            return -1;
+        }
+        if (path[0] == '/' && path_len == 1)
+        {
+            send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+            free(path);
+            return -1;
+        }
+        else if (path[0] != '/')
+        {
+            send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+            free(path);
+            return -1;
+        }
+        else
             temp_path++;
         strcpy(buff[client_socket].path, temp_path);
         buff[client_socket].read_path == 1;
@@ -221,25 +279,27 @@ int handle_write(int epoll_fd, int client_socket)
     {
         if ((fd = open(buff[client_socket].path, O_RDONLY | O_NONBLOCK)) == -1) //FILE NOTFOUND
         {
+#ifdef DEBUG
+            printf("Open file failed.\n");
+#endif
             if (errno == ENOENT)
             {
                 send(client_socket, HTTP_STATUS_404, strlen(HTTP_STATUS_404), 0);
-                close(fd);
-                shutdown(client_socket, SHUT_RDWR);
-                if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
-                    handle_error("epoll delete");
-                close(client_socket);
-                return 0;
+                return -1;
             }
             else if (errno == 21)
             {
                 send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
-                close(fd);
-                shutdown(client_socket, SHUT_RDWR);
-                if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
-                    handle_error("epoll delete");
-                close(client_socket);
-                return 0;
+                return -1;
+            }
+            else if (errno == EMFILE)
+            {
+                struct rlimit r;
+                if(getrlimit(RLIMIT_NOFILE,&r) < 0)
+                    handle_error("getrlimit");
+                r.rlim_cur = r.rlim_max = 4096;
+                if (setrlimit(RLIMIT_NOFILE, &r) < 0)
+                    handle_error("setrlimit");
             }
             else
                 handle_error("Opening file");
@@ -277,10 +337,18 @@ int handle_write(int epoll_fd, int client_socket)
         {
             int ret = send(client_socket, buff[client_socket].header_buffer + buff[client_socket].header_offset, buff[client_socket].header_length - buff[client_socket].header_offset, 0);
             if (ret == -1)
-                if (errno != EAGAIN)
-                    handle_error("Sending header");
-                else
+                if (errno == EPIPE)
+                {
+                    return -2;
+                }
+                else if (errno == EAGAIN)
                     return 0;
+                else if (errno == ECONNRESET)
+                {
+                    return -2;
+                }
+                else
+                    handle_error("Sending header");
 
             buff[client_socket].header_offset += ret;
         }
@@ -292,7 +360,7 @@ int handle_write(int epoll_fd, int client_socket)
 #ifdef DEBUG
         printf("filesize:%d\n", buff[client_socket].file_size);
 #endif
-        while (buff[client_socket].file_size > 0)
+        while (buff[client_socket].file_size > buff[client_socket].write_offset)
         {
 #ifdef DEBUG
             printf("client num:%d\n", client_socket);
@@ -309,29 +377,25 @@ int handle_write(int epoll_fd, int client_socket)
 #endif
                 if (errno == EPIPE)
                 {
-                    buff[client_socket].have_written_file = 1;
-                    return 1；
+                    return -2;
                 }
                 else if (errno == EAGAIN)
                     return 0;
                 else if (errno == ECONNRESET)
                 {
-                    buff[client_socket].have_written_file = 1;
-                    return 1;
+                    return -2;
                 }
+                
                 else
                     handle_error("Sending file");
             }
-            else if (ret == 0)
-            {
-                buff[client_socket].have_written_file = 1;
-                return 1;
-            }
-
-#ifdef DEBUG
-            printf("filesize:%d\n", buff[client_socket].file_size);
-#endif
+            // else if (ret == 0)
+            // {
+            //     buff[client_socket].have_written_file = 1;
+            //     return 1;
+            // }
         }
+
         buff[client_socket].have_written_file = 1;
     }
 
@@ -414,7 +478,8 @@ int run_server()
             else if (events[i].events & EPOLLIN)
             {
                 client_socket = events[i].data.fd;
-                if (handle_read(epfd, client_socket))
+                int ret = handle_read(epfd, client_socket);
+                if (ret == 1)
                 {
                     ev.events = EPOLLOUT;
                     ev.data.fd = client_socket;
@@ -428,6 +493,21 @@ int run_server()
                 int ret = handle_write(epfd, client_socket);
 
                 if (ret == 1)
+                {
+                    close(buff[client_socket].fd);
+                    memset(&buff[client_socket], 0, sizeof(struct buf));
+                    if (epoll_ctl(epfd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
+                        handle_error("epoll delete");
+                    close(client_socket);
+                }
+                else if (ret == -1)
+                {
+                    memset(&buff[client_socket], 0, sizeof(struct buf));
+                    if (epoll_ctl(epfd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
+                        handle_error("epoll delete");
+                    close(client_socket);
+                }
+                else if (ret == -2)
                 {
                     close(buff[client_socket].fd);
                     memset(&buff[client_socket], 0, sizeof(struct buf));
