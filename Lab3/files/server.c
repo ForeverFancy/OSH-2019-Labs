@@ -55,21 +55,21 @@ void init()
     memset(buff, 0, MAX_FDS * sizeof(struct buf));
 }
 
-void set_root()
-{
-    char wd[MAX_PATH_LEN];
-    getcwd(wd, sizeof(wd));
-    chroot(wd);
-    chdir(".");
-#ifdef DEBUG
-
-#endif
-}
-
 void handle_error(char *msg)
 {
     perror(msg);
     exit(1);
+}
+
+void set_root()
+{
+    char wd[MAX_PATH_LEN];
+    if (getcwd(wd, sizeof(wd)) == NULL)
+        handle_error("getcwd failed");
+    if (chroot(wd) == -1)
+        handle_error("chroot failed");
+    if (chdir(".") == -1)
+        handle_error("chdir failed");
 }
 
 int check_end(char *request, int length)
@@ -126,17 +126,17 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
     if (req[t] == '\0')
     {
 #ifdef DEBUG
-	printf("t==0 req[t+1]:%c\n",req[t+1]);
+        printf("t==0 req[t+1]:%c\n", req[t + 1]);
 #endif
         //free(method);
         //close_request(client_socket);
         //return -1;
     }
-    else if (req[t] == ' ' && req[t]=='\0')
+    else if (req[t] == ' ' && req[t] == '\0')
     {
-	    req[t] = '\0';
+        req[t] = '\0';
         strncpy(method, req, t);
-	    strcat(method,"\0");
+        strcat(method, "\0");
 #ifdef DEBUG
         printf("t=%d\n", t);
         printf("method:%s\n", method);
@@ -152,7 +152,7 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
     if (req[s] == '\0')
     {
 #ifdef DEBUG
-	printf("s=0 req[s+1]:%c req:%s\n",req[s+1],req+s+1);
+        printf("s=0 req[s+1]:%c req:%s\n", req[s + 1], req + s + 1);
 #endif
         //free(method);
         //close_request(client_socket);
@@ -303,7 +303,7 @@ int handle_write(int epoll_fd, int client_socket)
             else if (errno == EMFILE)
             {
                 struct rlimit r;
-                if(getrlimit(RLIMIT_NOFILE,&r) < 0)
+                if (getrlimit(RLIMIT_NOFILE, &r) < 0)
                     handle_error("getrlimit");
                 r.rlim_cur = r.rlim_max = 4096;
                 if (setrlimit(RLIMIT_NOFILE, &r) < 0)
@@ -389,7 +389,16 @@ int handle_write(int epoll_fd, int client_socket)
                     return 0;
                 else if (errno == ECONNRESET)
                     return -2;
-                
+                else if (errno == ESPIPE)
+                {
+                    struct rlimit r;
+                    if (getrlimit(RLIMIT_NOFILE, &r) < 0)
+                        handle_error("getrlimit");
+                    r.rlim_cur = r.rlim_max = 4096;
+                    if (setrlimit(RLIMIT_NOFILE, &r) < 0)
+                        handle_error("setrlimit");
+                    return -2;
+                }
                 else
                     handle_error("Sending file");
             }
@@ -528,6 +537,7 @@ int run_server()
 
 int main()
 {
+    set_root();
     signal(SIGPIPE, SIG_IGN);
     run_server();
     return 0;
