@@ -111,6 +111,7 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
     char *req = request;
 
     char *method = (char *)malloc(MAX_PATH_LEN * sizeof(char));
+    memset(method, 0, MAX_PATH_LEN * sizeof(char));
     int t = 0;
     while (req[t] != '\0' && req[t] != ' ' && t < length)
     {
@@ -124,14 +125,18 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
 
     if (req[t] == '\0')
     {
-        free(method);
-        close_request(client_socket);
-        return -1;
+#ifdef DEBUG
+	printf("t==0 req[t+1]:%c\n",req[t+1]);
+#endif
+        //free(method);
+        //close_request(client_socket);
+        //return -1;
     }
-    else if (req[t] == ' ')
+    else if (req[t] == ' ' && req[t]=='\0')
     {
-        req[t] = '\0';
+	    req[t] = '\0';
         strncpy(method, req, t);
+	    strcat(method,"\0");
 #ifdef DEBUG
         printf("t=%d\n", t);
         printf("method:%s\n", method);
@@ -146,9 +151,12 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
 
     if (req[s] == '\0')
     {
-        free(method);
-        close_request(client_socket);
-        return -1;
+#ifdef DEBUG
+	printf("s=0 req[s+1]:%c req:%s\n",req[s+1],req+s+1);
+#endif
+        //free(method);
+        //close_request(client_socket);
+        //return -1;
     }
     req[s] = '\0';
     strncpy(path, req + t + 1, s - t);
@@ -376,15 +384,11 @@ int handle_write(int epoll_fd, int client_socket)
                 printf("errno:%d\n", errno);
 #endif
                 if (errno == EPIPE)
-                {
                     return -2;
-                }
                 else if (errno == EAGAIN)
                     return 0;
                 else if (errno == ECONNRESET)
-                {
                     return -2;
-                }
                 
                 else
                     handle_error("Sending file");
