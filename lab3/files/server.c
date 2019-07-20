@@ -28,7 +28,7 @@
 #define HTTP_STATUS_404 "HTTP/1.0 404 Not Found\r\n"
 #define HTTP_STATUS_500 "HTTP/1.0 500 Internal Server Error\r\n"
 
-int flag = 1;
+FILE *f_log;
 
 struct buf
 {
@@ -53,23 +53,32 @@ struct buf
 void init()
 {
     memset(buff, 0, MAX_FDS * sizeof(struct buf));
+    f_log = fopen("msg.log", "a+");
 }
 
-void handle_error(char *msg)
+void handle_error(int client, char *msg)
 {
-    perror(msg);
-    exit(1);
+    fprintf(f_log, "Client %d: %s", client, msg);
 }
 
 void set_root()
 {
     char wd[MAX_PATH_LEN];
     if (getcwd(wd, sizeof(wd)) == NULL)
-        handle_error("getcwd failed");
+    {
+        perror("getcwd failed");
+        exit(-1);
+    }
     if (chroot(wd) == -1)
-        handle_error("chroot failed");
+    {
+        perror("chroot failed");
+        exit(-1);
+    }
     if (chdir(".") == -1)
-        handle_error("chdir failed");
+    {
+        perror("chdir failed");
+        exit(-1);
+    }
 }
 
 int check_end(char *request, int length)
@@ -86,13 +95,13 @@ void set_nonblocking(int fd)
 {
     int flag;
     if ((flag = fcntl(fd, F_GETFL, 0)) == -1)
-        handle_error("fcntl");
+        handle_error(fd, "fcntl");
     else
     {
         int temp;
         flag = flag | O_NONBLOCK;
         if ((temp = fcntl(fd, F_SETFL, flag)) == -1)
-            handle_error("fcntl");
+            handle_error(fd, "fcntl");
     }
 }
 
@@ -128,9 +137,6 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
 #ifdef DEBUG
         printf("t==0 req[t+1]:%c\n", req[t + 1]);
 #endif
-        //free(method);
-        //close_request(client_socket);
-        //return -1;
     }
     else if (req[t] == ' ' && req[t] == '\0')
     {
@@ -154,9 +160,6 @@ int parse_request(int client_socket, char *request, int length, char *path, ssiz
 #ifdef DEBUG
         printf("s=0 req[s+1]:%c req:%s\n", req[s + 1], req + s + 1);
 #endif
-        //free(method);
-        //close_request(client_socket);
-        //return -1;
     }
     req[s] = '\0';
     strncpy(path, req + t + 1, s - t);
@@ -205,7 +208,7 @@ int handle_read(int epoll_fd, int client_socket)
                 }
                 else if (errno != EAGAIN)
                 {
-                    handle_error("Reading from client");
+                    handle_error(client_socket, "Reading from client");
                 }
             }
             else if (check_end(buff[client_socket].read_buffer, buff[client_socket].read_offset + valread))
@@ -285,6 +288,14 @@ int handle_write(int epoll_fd, int client_socket)
 #endif
     if (buff[client_socket].open_file == 0)
     {
+        if (access(buff[client_socket].path, R_OK) == -1)
+        {
+#ifdef DEBUG
+            printf("File could not access.\n");
+#endif
+            send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+            return -1;
+        }
         if ((fd = open(buff[client_socket].path, O_RDONLY | O_NONBLOCK)) == -1) //FILE NOTFOUND
         {
 #ifdef DEBUG
@@ -304,13 +315,17 @@ int handle_write(int epoll_fd, int client_socket)
             {
                 struct rlimit r;
                 if (getrlimit(RLIMIT_NOFILE, &r) < 0)
-                    handle_error("getrlimit");
+                    send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
                 r.rlim_cur = r.rlim_max = 4096;
                 if (setrlimit(RLIMIT_NOFILE, &r) < 0)
-                    handle_error("setrlimit");
+                    send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+                return -1;
             }
             else
-                handle_error("Opening file");
+            {
+                send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+                return -1;
+            }
         }
         else
         {
@@ -326,6 +341,11 @@ int handle_write(int epoll_fd, int client_socket)
     {
         struct stat statbuf;
         fstat(fd, &statbuf);
+        if (S_ISDIR(statbuf.st_mode))
+        {
+            send(client_socket, HTTP_STATUS_500, strlen(HTTP_STATUS_500), 0);
+            return -1;
+        }
         buff[client_socket].file_size = statbuf.st_size;
         char *length_response = (char *)malloc(1024 * sizeof(char));
         strcpy(buff[client_socket].header_buffer, HTTP_STATUS_200);
@@ -356,7 +376,10 @@ int handle_write(int epoll_fd, int client_socket)
                     return -2;
                 }
                 else
-                    handle_error("Sending header");
+                {
+                    handle_error(client_socket, "Sending header");
+                    return -2;
+                }
 
             buff[client_socket].header_offset += ret;
         }
@@ -393,20 +416,18 @@ int handle_write(int epoll_fd, int client_socket)
                 {
                     struct rlimit r;
                     if (getrlimit(RLIMIT_NOFILE, &r) < 0)
-                        handle_error("getrlimit");
+                        handle_error(client_socket, "getrlimit");
                     r.rlim_cur = r.rlim_max = 4096;
                     if (setrlimit(RLIMIT_NOFILE, &r) < 0)
-                        handle_error("setrlimit");
+                        handle_error(client_socket, "setrlimit");
                     return -2;
                 }
                 else
-                    handle_error("Sending file");
+                {
+                    handle_error(client_socket, "Sending file");
+                    return -2;
+                }
             }
-            // else if (ret == 0)
-            // {
-            //     buff[client_socket].have_written_file = 1;
-            //     return 1;
-            // }
         }
 
         buff[client_socket].have_written_file = 1;
@@ -445,25 +466,33 @@ int run_server()
 
     if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
-        handle_error("Bind failed");
+        perror("Bind failed");
+        exit(-1);
     }
 
     if (listen(server_socket, MAX_CONN))
     {
-        handle_error("Listen failed");
+        perror("Listen failed");
+        exit(-1);
     }
 
     printf("\nServer Waiting for client on port 8000.\n");
 
     epfd = epoll_create(MAX_FDS); // Create epoll.
     if (epfd == -1)
-        handle_error("Create epoll");
+    {
+        perror("Create epoll");
+        exit(-1);
+    }
 
     ev.events = EPOLLIN;
     ev.data.fd = server_socket;
 
     if ((epoll_ctl(epfd, EPOLL_CTL_ADD, server_socket, &ev)) == -1) //Register event.
-        handle_error("Register epoll");
+    {
+        perror("Register epoll");
+        exit(-1);
+    }    
 
     struct sockaddr_in client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
@@ -473,7 +502,10 @@ int run_server()
         int client_socket;
         num_of_events = epoll_wait(epfd, events, MAX_FDS, -1);
         if (num_of_events == -1)
-            handle_error("epoll wait");
+        {
+            perror("epoll wait");
+            exit(-1);
+        }
 
         for (int i = 0; i < num_of_events; i++)
         {
@@ -481,12 +513,15 @@ int run_server()
             {
                 client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_size);
                 if (client_socket == -1)
-                    handle_error("accept");
+                {
+                    perror("accept");
+                    exit(-1);
+                }
                 set_nonblocking(client_socket);
                 ev.events = EPOLLIN | EPOLLET;
                 ev.data.fd = client_socket;
                 if ((epoll_ctl(epfd, EPOLL_CTL_ADD, client_socket, &ev)) == -1)
-                    handle_error("epoll connect");
+                    handle_error(client_socket, "epoll connect");
             }
             else if (events[i].events & EPOLLIN)
             {
@@ -497,7 +532,7 @@ int run_server()
                     ev.events = EPOLLOUT;
                     ev.data.fd = client_socket;
                     if (epoll_ctl(epfd, EPOLL_CTL_MOD, client_socket, &ev) == -1)
-                        handle_error("epoll modified");
+                        handle_error(client_socket, "epoll modified");
                 }
             }
             else if (events[i].events & EPOLLOUT)
@@ -510,14 +545,14 @@ int run_server()
                     close(buff[client_socket].fd);
                     memset(&buff[client_socket], 0, sizeof(struct buf));
                     if (epoll_ctl(epfd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
-                        handle_error("epoll delete");
+                        handle_error(client_socket, "epoll delete");
                     close(client_socket);
                 }
                 else if (ret == -1)
                 {
                     memset(&buff[client_socket], 0, sizeof(struct buf));
                     if (epoll_ctl(epfd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
-                        handle_error("epoll delete");
+                        handle_error(client_socket, "epoll delete");
                     close(client_socket);
                 }
                 else if (ret == -2)
@@ -525,7 +560,7 @@ int run_server()
                     close(buff[client_socket].fd);
                     memset(&buff[client_socket], 0, sizeof(struct buf));
                     if (epoll_ctl(epfd, EPOLL_CTL_DEL, client_socket, NULL) == -1)
-                        handle_error("epoll delete");
+                        handle_error(client_socket, "epoll delete");
                     close(client_socket);
                 }
             }
